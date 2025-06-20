@@ -1,0 +1,8 @@
+CREATE TABLE `project`.`view` (
+  `viewid` INT NOT NULL,
+  `name` VARCHAR(45) NULL,
+  `type` VARCHAR(45) NULL,
+  `description` TEXT NULL,
+  `image` TEXT NULL,
+  `additionalimage` TEXT NULL,
+  PRIMARY KEY (`viewid`));

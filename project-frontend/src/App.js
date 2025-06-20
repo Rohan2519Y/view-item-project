@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppBar,
   Box,
@@ -12,7 +12,6 @@ import {
   DialogActions,
   Grid,
   IconButton,
-  Snackbar,
   Tab,
   Tabs,
   TextField,
@@ -20,13 +19,15 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Select,
+  Select
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MailIcon from '@mui/icons-material/Mail';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import Swal from "sweetalert2"
+import DeleteIcon from '@mui/icons-material/Delete';
+import Swal from "sweetalert2";
+import { serverURL, postData, getData } from './services/backendServices';
 
 const itemTypes = ['Shirt', 'Pant', 'Shoes', 'Sports Gear', 'Accessories', 'Other'];
 
@@ -40,67 +41,131 @@ const App = () => {
     coverImage: null,
     additionalImages: []
   });
-  const [success, setSuccess] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [coverImagePreview, setCoverImagePreview] = useState(null);
+  const [additionalImagePreviews, setAdditionalImagePreviews] = useState([]);
+  const coverInputRef = useRef();
+  const additionalInputRef = useRef();
 
   useEffect(() => {
-    // Load default items
-    setItems([
-      {
-        id: 1,
-        name: 'Sample T-Shirt',
-        type: 'Shirt',
-        description: 'A stylish cotton t-shirt',
-        coverImage: 'https://via.placeholder.com/300x180?text=T-Shirt',
-        additionalImages: ['https://via.placeholder.com/300x200?text=Back']
-      }
-    ]);
+    fetchItems();
   }, []);
+
+  const fetchItems = async () => {
+    const result = await getData('item/fetch_items');
+    if (result && result.status) {
+      const fetchedItems = result.data.map((item) => ({
+        ...item,
+        coverImage: `${serverURL}/images/${item.image}`,
+        additionalImages: item.additionalimage
+          ? item.additionalimage.split(',').map(img => `${serverURL}/images/${img}`)
+          : []
+      }));
+      setItems(fetchedItems);
+    } else {
+      console.error(result?.message || 'Fetch failed');
+    }
+  };
 
   const handleTabChange = (event, newValue) => setTab(newValue);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleFileChange = (e, type) => {
     const files = Array.from(e.target.files);
-    if (type === 'cover') setFormData({ ...formData, coverImage: files[0] });
-    else setFormData({ ...formData, additionalImages: files });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const newItem = {
-      id: Date.now(),
-      name: formData.name,
-      type: formData.type,
-      description: formData.description,
-      coverImage: formData.coverImage ? URL.createObjectURL(formData.coverImage) : '',
-      additionalImages: formData.additionalImages.map(file => URL.createObjectURL(file))
-    };
-
-    setItems(prev => [...prev, newItem]);
-    setFormData({ name: '', type: '', description: '', coverImage: null, additionalImages: [] });
-    setSuccess(true);
-
-    if (newItem) {
-      Swal.fire({
-        icon: "success",
-        title: "Product Register",
-        text: 'Record Submitted Successfully',
-        toast: true
+    
+    if (type === 'cover') {
+      const file = files[0];
+      setFormData(prev => ({ ...prev, coverImage: file }));
+      
+      // Create preview for cover image
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => setCoverImagePreview(e.target.result);
+        reader.readAsDataURL(file);
+      } else {
+        setCoverImagePreview(null);
+      }
+    } else {
+      setFormData(prev => ({ ...prev, additionalImages: files }));
+      
+      // Create previews for additional images
+      const previewPromises = files.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+      });
+      
+      Promise.all(previewPromises).then(previews => {
+        setAdditionalImagePreviews(previews);
       });
     }
-    // Reset file inputs
-    document.getElementById('cover-image').value = '';
-    document.getElementById('additional-images').value = '';
   };
 
-  const handleEnquire = async (item) => {
+  const removeCoverImage = () => {
+    setFormData(prev => ({ ...prev, coverImage: null }));
+    setCoverImagePreview(null);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  };
+
+  const removeAdditionalImage = (index) => {
+    const newFiles = [...formData.additionalImages];
+    newFiles.splice(index, 1);
+    setFormData(prev => ({ ...prev, additionalImages: newFiles }));
+    
+    const newPreviews = [...additionalImagePreviews];
+    newPreviews.splice(index, 1);
+    setAdditionalImagePreviews(newPreviews);
+    
+    // Reset the input to reflect the change
+    if (additionalInputRef.current) {
+      const dt = new DataTransfer();
+      newFiles.forEach(file => dt.items.add(file));
+      additionalInputRef.current.files = dt.files;
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const form = new FormData();
+    form.append('name', formData.name);
+    form.append('type', formData.type);
+    form.append('description', formData.description);
+    if (formData.coverImage) form.append('image', formData.coverImage);
+    formData.additionalImages.forEach((file) => {
+      form.append('additionalimages', file);
+    });
+
+    const result = await postData('item/insert_items', form);
+
+    if (result && result.status) {
+      Swal.fire({
+        icon: "success",
+        title: "Product Registered",
+        text: result.message,
+        toast: true,
+        timer: 3000,
+        showConfirmButton: false
+      });
+      setFormData({ name: '', type: '', description: '', coverImage: null, additionalImages: [] });
+      setCoverImagePreview(null);
+      setAdditionalImagePreviews([]);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      if (additionalInputRef.current) additionalInputRef.current.value = '';
+      fetchItems();
+    } else {
+      Swal.fire({ icon: 'error', title: 'Failed', text: result.message });
+    }
+  };
+
+  const handleEnquire = (item) => {
     const subject = `Inquiry about ${item.name}`;
     const body = `Hi, I'm interested in the item: ${item.name} (${item.type}).\n\n${item.description}`;
     const mailto = `mailto:info@example.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -174,24 +239,99 @@ const App = () => {
             margin="normal"
             required
           />
+          
+          {/* Cover Image Section */}
           <Box my={2}>
+            <Typography variant="subtitle1" gutterBottom>
+              Cover Image *
+            </Typography>
             <input
               accept="image/*"
               id="cover-image"
               type="file"
+              ref={coverInputRef}
               onChange={(e) => handleFileChange(e, 'cover')}
               required
+              style={{ marginBottom: '10px' }}
             />
+            {coverImagePreview && (
+              <Box mt={1} position="relative" display="inline-block">
+                <img
+                  src={coverImagePreview}
+                  alt="Cover preview"
+                  style={{
+                    maxWidth: '200px',
+                    maxHeight: '200px',
+                    objectFit: 'cover',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px'
+                  }}
+                />
+                <IconButton
+                  onClick={removeCoverImage}
+                  sx={{
+                    position: 'absolute',
+                    top: -10,
+                    right: -10,
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                  }}
+                  size="small"
+                >
+                  <DeleteIcon color="error" />
+                </IconButton>
+              </Box>
+            )}
           </Box>
+
+          {/* Additional Images Section */}
           <Box my={2}>
+            <Typography variant="subtitle1" gutterBottom>
+              Additional Images (Optional)
+            </Typography>
             <input
               accept="image/*"
               id="additional-images"
               type="file"
               multiple
+              ref={additionalInputRef}
               onChange={(e) => handleFileChange(e, 'additional')}
+              style={{ marginBottom: '10px' }}
             />
+            {additionalImagePreviews.length > 0 && (
+              <Box mt={1} display="flex" flexWrap="wrap" gap={1}>
+                {additionalImagePreviews.map((preview, index) => (
+                  <Box key={index} position="relative" display="inline-block">
+                    <img
+                      src={preview}
+                      alt={`Additional preview ${index + 1}`}
+                      style={{
+                        width: '120px',
+                        height: '120px',
+                        objectFit: 'cover',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <IconButton
+                      onClick={() => removeAdditionalImage(index)}
+                      sx={{
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                      }}
+                      size="small"
+                    >
+                      <DeleteIcon color="error" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
+
           <Button variant="contained" color="primary" type="submit">
             Add Item
           </Button>

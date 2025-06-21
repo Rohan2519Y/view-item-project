@@ -1,8 +1,9 @@
 CREATE TABLE `project`.`view` (
-  `viewid` INT NOT NULL,
-  `name` VARCHAR(45) NULL,
-  `type` VARCHAR(45) NULL,
-  `description` TEXT NULL,
-  `image` TEXT NULL,
-  `additionalimage` TEXT NULL,
-  PRIMARY KEY (`viewid`));
+  `viewid` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(45),
+  `type` VARCHAR(45),
+  `description` TEXT,
+  `image` TEXT,
+  `additionalimage` TEXT,
+  PRIMARY KEY (`viewid`)
+);

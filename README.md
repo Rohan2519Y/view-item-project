@@ -17,7 +17,7 @@ Navigate to backend/ → ```npm install```
 
 Setup Database
 
-Execute SQL code in MySQL
+Execute SQL code from project.sql in MySQL
 Update password in backend/pool.js
 
 

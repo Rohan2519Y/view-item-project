@@ -3,10 +3,9 @@ var router = express.Router();
 var upload = require('./multer');
 var pool = require('./pool');
 
-// Route for inserting item with one cover image and multiple additional images
 router.post('/insert_items', upload.fields([
-  { name: 'image', maxCount: 1 },              // cover image
-  { name: 'additionalimages', maxCount: 10 }   // additional images
+  { name: 'image', maxCount: 1 },              
+  { name: 'additionalimages', maxCount: 10 }   
 ]), function (req, res, next) {
   try {
     const coverImage = req.files['image'] ? req.files['image'][0].filename : '';
@@ -24,22 +23,22 @@ router.post('/insert_items', upload.fields([
       function (error, result) {
         if (error) {
           console.error(error);
-          // Return proper error status
+          
           res.status(500).json({ status: false, message: 'Database Error, Please Contact Backend Team' });
         } else {
-          // Success response
+      
           res.status(201).json({ status: true, message: 'Item Successfully Submitted' });
         }
       }
     );
   } catch (e) {
     console.error(e);
-    // Return proper error status
+  
     res.status(500).json({ status: false, message: 'Critical Error, Please Contact Server Administrator' });
   }
 });
 
-// Fetch all items
+
 router.get('/fetch_items', function (req, res, next) {
   try {
     pool.query('SELECT * FROM item', function (error, result) {

@@ -82,7 +82,6 @@ const App = () => {
       const file = files[0];
       setFormData(prev => ({ ...prev, coverImage: file }));
       
-      // Create preview for cover image
       if (file) {
         const reader = new FileReader();
         reader.onload = (e) => setCoverImagePreview(e.target.result);
@@ -92,8 +91,7 @@ const App = () => {
       }
     } else {
       setFormData(prev => ({ ...prev, additionalImages: files }));
-      
-      // Create previews for additional images
+
       const previewPromises = files.map(file => {
         return new Promise((resolve) => {
           const reader = new FileReader();
@@ -123,7 +121,6 @@ const App = () => {
     newPreviews.splice(index, 1);
     setAdditionalImagePreviews(newPreviews);
     
-    // Reset the input to reflect the change
     if (additionalInputRef.current) {
       const dt = new DataTransfer();
       newFiles.forEach(file => dt.items.add(file));
@@ -239,8 +236,7 @@ const App = () => {
             margin="normal"
             required
           />
-          
-          {/* Cover Image Section */}
+
           <Box my={2}>
             <Typography variant="subtitle1" gutterBottom>
               Cover Image *
@@ -284,7 +280,6 @@ const App = () => {
             )}
           </Box>
 
-          {/* Additional Images Section */}
           <Box my={2}>
             <Typography variant="subtitle1" gutterBottom>
               Additional Images (Optional)
